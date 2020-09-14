@@ -1,0 +1,129 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+## analisis de creditos usando Regresion logistica
+
+# cargamos data set 
+
+credit.df <- read.csv("../Desktop/german_credit.csv.txt", header = TRUE, stringsAsFactors = FALSE)
+```
+
+
+```{r}
+##convertimos las variables a factor
+to.factors <- function(df, variables) {
+                for(variable in variables) {
+                               df[[variable]] <- as.factor(df[[variable]])
+                }
+                return(df)
+}
+```
+
+
+```{r}
+## normalizamos 
+scale.features <- function(df, variables) {
+                for(variable in variables) {
+                               df[[variable]] <- scale(df[[variable]], center=T, scale=T)
+                }
+                return(df)
+}
+```
+
+
+```{r}
+#normalizamos  variables
+
+numeric.vars <- c("credit.duration.months", "age", "credit.amount")
+credit.df <- scale.features(credit.df, numeric.vars)
+```
+
+
+```{r}
+#factor variables
+categorical.vars <- c('credit.rating','account.balance','previous.credit.payment.status','credit.purpose','savings',
+'employment.duration','installment.rate','marital.status','guarantor','residence.duration','current.assets','other.credits', 'apartment.type','bank.credits','occupation','dependents','telephone','foreign.worker')
+
+credit.df <- to.factors(df=credit.df, variables = categorical.vars)
+```
+
+
+```{r}
+## Dividimos el training and test dataset a una proporcion de 60:40.
+indexes <- sample(1:nrow(credit.df), size = 0.6*nrow(credit.df))
+
+train.data <- credit.df[indexes, ]
+test.data <- credit.df[-indexes, ]
+```
+
+
+```{r}
+#cargamos las librerias 
+
+library(caret)
+library(ROCR)
+library(e1071)
+```
+
+
+```{r}
+
+
+#separate feature and class variable
+test.feature.vars <- test.data[,-1]
+test.class.vars <- test.data[,1]
+
+##Entrenamos el modelo inicial con todas las variables independientes:
+formula.init <- "credit.rating ~ ."
+formula.init <- as.formula(formula.init)
+lr.model <- glm(formula=formula.init, data=train.data, family="binomial")
+
+# observamos el modelo
+summary(lr.model)
+```
+
+```{r}
+#creamos una Matriz de confusion
+
+lr.predictions <- predict(lr.model, test.data, type = "response")
+lr.predictions <- round(lr.predictions)
+confusionMatrix(data=lr.predictions, reference=test.class.vars, positive = '1')
+
+```
+
+```{r}
+
+#obseramos las predicciones del modelo
+lr.prediction.values <- predict(lr.model, test.feature.vars, type = "response")
+predictions <- prediction(lr.prediction.values, test.class.vars)
+
+perf <- performance(predictions,"tpr","fpr")
+plot(perf,col="black")
+
+
+```
+```{r}
+auc <- performance(predictions,"auc")
+auc
+
+#conclusion 
+
+## AUC es de 0,73 que es bastante bueno para empezar. Ahora tenemos un modelo, pero esto no depende únicamente de la precisión, sino del analisis del negocio. Si predecimos que un cliente con una calificación crediticia mala (0) es bueno (1), significa que vamos a aprobar el préstamo de crédito para el cliente que terminará por no pagarlo, lo que causará pérdidas al banco. Sin embargo, si predijeramos que un cliente con buena calificación crediticia (1) es malo (0), significa que le negaremos el préstamo, en cuyo caso el banco no beneficiará ni incurrirá en pérdidas. Esto es mucho mejor que incurrir en enormes pérdidas al predecir mal las calificaciones de crédito malas como buenas.
+```
+
+
+
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
